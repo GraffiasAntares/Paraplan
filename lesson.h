@@ -10,6 +10,8 @@ struct Lesson {
     int day;        // День недели
     int slot;       // Номер слота в дне
     std::string type; // Тип занятия (Лекция / Практика / Лабораторная)
+    int room_capacity; // Количество мест в аудитории
+    std::string room_type; // Класс аудитории (Компьютерная / Лекционная / Лабораторная)
 
     Lesson() = default;
 };

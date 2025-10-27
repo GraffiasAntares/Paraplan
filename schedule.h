@@ -24,7 +24,10 @@ public:
                     l.group = g;
                     l.day = d;
                     l.slot = slot_dist(gen);
-                    l.room = room_dist(gen);
+                    int room = room_dist(gen);
+                    l.room = room;
+                    l.room_capacity = Config::room_capacities[room];
+                    l.room_type = Config::room_types[room];
                     l.type = (type_dist(gen) == 0 ? "Лекция" : (type_dist(gen) == 1 ? "Практика" : "Лабораторная"));
 
                     // Подбираем корректную пару преподаватель-предмет
@@ -44,8 +47,10 @@ public:
         double hard_conflicts = 0.0;
         double soft_gaps = 0.0;
         double soft_balance = 0.0;
+        double capacity_conflicts = 0.0;
+        double type_conflicts = 0.0;
 
-        // Проверка жёстких конфликтов
+        // Проверка жёстких конфликтов (группы, преподаватели, аудитории)
         for (size_t i = 0; i < lessons.size(); ++i) {
             for (size_t j = i + 1; j < lessons.size(); ++j) {
                 const Lesson& a = lessons[i], & b = lessons[j];
@@ -54,6 +59,20 @@ public:
                     if (a.teacher == b.teacher) hard_conflicts++;
                     if (a.room == b.room) hard_conflicts++;
                 }
+            }
+        }
+
+        // Проверка конфликтов по вместимости и типу аудитории
+        for (const auto& l : lessons) {
+            // Нехватка мест: если число студентов группы превышает вместимость аудитории
+            if (Config::group_sizes[l.group] > l.room_capacity) {
+                capacity_conflicts++;
+            }
+            // Неподходящий класс аудитории: тип занятия не соответствует классу аудитории
+            if ((l.type == "Лекция" && l.room_type != "Лекционная") ||
+                (l.type == "Практика" && l.room_type != "Компьютерная") ||
+                (l.type == "Лабораторная" && l.room_type != "Лабораторная")) {
+                type_conflicts++;
             }
         }
 
@@ -86,8 +105,22 @@ public:
                 soft_balance += std::pow(v - mean, 2);
         }
 
-        // Возвращаем вектор целей
-        return { hard_conflicts, soft_gaps, soft_balance };
+        // Нормировка критериев
+        double max_conflicts = lessons.size() * (lessons.size() - 1) / 2.0; // Максимум парного сравнения уроков
+        double max_gaps = Config::NUM_GROUPS * Config::NUM_DAYS * (Config::SLOTS_PER_DAY - 1); // Максимум окон
+        double max_balance = Config::NUM_GROUPS * (std::pow(2 * Config::NUM_DAYS - 2, 2) + (Config::NUM_DAYS - 1) * std::pow(2, 2)); // Максимум баланса
+        double max_capacity_conflicts = lessons.size(); // Максимум: каждый урок имеет конфликт по вместимости
+        double max_type_conflicts = lessons.size(); // Максимум: каждый урок имеет конфликт по типу
+
+        // Приведение к диапазону [0;1]
+        hard_conflicts = max_conflicts > 0 ? hard_conflicts / max_conflicts : 0.0;
+        soft_gaps = max_gaps > 0 ? soft_gaps / max_gaps : 0.0;
+        soft_balance = max_balance > 0 ? soft_balance / max_balance : 0.0;
+        capacity_conflicts = max_capacity_conflicts > 0 ? capacity_conflicts / max_capacity_conflicts : 0.0;
+        type_conflicts = max_type_conflicts > 0 ? type_conflicts / max_type_conflicts : 0.0;
+
+        // Возвращаем нормированный вектор целей
+        return { hard_conflicts, soft_gaps, soft_balance, capacity_conflicts, type_conflicts };
     }
 
     void mutate(std::mt19937& gen) {
@@ -99,7 +132,10 @@ public:
         for (auto& l : lessons) {
             if (prob(gen) < Config::MUTATION_RATE) {
                 l.slot = slot_dist(gen);
-                l.room = room_dist(gen);
+                int room = room_dist(gen);
+                l.room = room;
+                l.room_capacity = Config::room_capacities[room];
+                l.room_type = Config::room_types[room];
                 l.day = day_dist(gen);
             }
         }

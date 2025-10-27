@@ -28,7 +28,7 @@
 		5088EB372E93ADCE00AAD3AC /* config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
 		5088EB382E93ADDB00AAD3AC /* lesson.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = lesson.h; sourceTree = "<group>"; };
 		5088EB392E93ADE700AAD3AC /* schedule.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = schedule.h; sourceTree = "<group>"; };
-		5088EB3A2E93ADFE00AAD3AC /* genetic_algorithm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = genetic_algorithm.h; sourceTree = "<group>"; };
+		50C748282EA63A3600391764 /* genetic_algorithm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = genetic_algorithm.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,7 +45,7 @@
 		5060E9DE2E8A86420072DA6E = {
 			isa = PBXGroup;
 			children = (
-				5088EB3A2E93ADFE00AAD3AC /* genetic_algorithm.h */,
+				50C748282EA63A3600391764 /* genetic_algorithm.h */,
 				5088EB392E93ADE700AAD3AC /* schedule.h */,
 				5088EB382E93ADDB00AAD3AC /* lesson.h */,
 				5088EB372E93ADCE00AAD3AC /* config.h */,
