@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Параплан</title>
+<style>
+  :root{
+    --bg:#f4fbff;
+    --card:#ffffff;
+    --muted:#6b7280;
+    --accent:#1e88e5;
+    --good:#16a34a;
+    --warn:#f59e0b;
+    --bad:#ef4444;
+    --glass: rgba(255,255,255,0.7);
+    --radius:12px;
+    --shadow: 0 8px 28px rgba(16,24,40,0.08);
+    --mono: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  html,body{height:100%;margin:0;font-family:var(--mono);background:linear-gradient(180deg,#eaf6ff 0%,var(--bg) 60%);color:#0f172a}
+  .wrap{max-width:1200px;margin:28px auto;padding:20px;box-sizing:border-box}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  header h1{margin:0;font-size:22px}
+  header p{margin:0;color:var(--muted);font-size:13px}
+
+  .topbar{display:flex;gap:16px;align-items:center}
+  .controls{display:flex;gap:8px;align-items:center}
+  .btn{background:var(--accent);color:#fff;padding:8px 12px;border-radius:10px;border:none;cursor:pointer;box-shadow: 0 6px 18px rgba(30,136,229,0.18)}
+  .btn.secondary{background:transparent;color:var(--accent);border:1px solid rgba(30,136,229,0.12)}
+  .search{padding:8px 12px;border-radius:10px;border:1px solid rgba(15,23,42,0.06);background:rgba(255,255,255,0.6)}
+
+  /* metrics table */
+  .metrics{
+    display:flex;gap:18px;align-items:flex-start;margin-bottom:20px;
+  }
+  .metrics .panel{
+    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px;width:360px;
+  }
+  .metrics h3{margin:0 0 8px 0;font-size:14px}
+  .metric-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px dashed rgba(15,23,42,0.03)}
+  .metric-row:first-of-type{border-top:none}
+  .metric-name{color:var(--muted);font-size:13px}
+  .metric-value{font-weight:700}
+
+  /* schedules grid */
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill,minmax(260px,1fr));
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .card{
+    background:var(--card);border-radius:12px;padding:12px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .card .head{display:flex;align-items:center;justify-content:space-between}
+  .card .title{font-weight:700}
+  .small{font-size:12px;color:var(--muted)}
+  .badgeb{padding:6px 8px;border-radius:8px;font-weight:700;font-size:12px}
+  .badge.good{background:rgba(22,163,74,0.12);color:var(--good)}
+  .badge.warn{background:rgba(245,158,11,0.08);color:var(--warn)}
+  .badge.bad{background:rgba(239,68,68,0.08);color:var(--bad)}
+
+  .mini-schedule{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+  .slot{background:linear-gradient(180deg,#fff,#fbfdff);padding:6px;border-radius:8px;border:1px solid rgba(15,23,42,0.03);font-size:12px}
+  .meta{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+
+  /* compare panel */
+  .compare-panel{background:var(--card);border-radius:12px;padding:12px;box-shadow:var(--shadow);margin-top:18px}
+  .compare-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .compare-cell{padding:10px;border-radius:10px;background:linear-gradient(180deg,#fff,#fcfeff);border:1px solid rgba(15,23,42,0.03)}
+  .diff-positive{color:var(--good);font-weight:700}
+  .diff-negative{color:var(--bad);font-weight:700}
+  .diff-neutral{color:var(--muted)}
+
+  .slot-table{width:100%;border-collapse:collapse}
+  .slot-table th,.slot-table td{padding:8px;border-bottom:1px solid rgba(15,23,42,0.04);text-align:left;font-size:13px}
+  .slot-table th{background:rgba(15,23,42,0.02);font-weight:700}
+
+  .teacher-list{margin-top:8px}
+  .teacher-item{padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.03);margin-bottom:8px;background:#fff}
+
+  footer{margin-top:28px;color:var(--muted);font-size:13px}
+
+  /* responsive tweaks */
+  @media (max-width:760px){
+    .metrics{flex-direction:column}
+    .compare-grid{grid-template-columns:1fr}
+    .mini-schedule{grid-template-columns:repeat(3,1fr)}
+  }
+
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Сравнение расписаний</h1>
+        <p>Выберите два расписания — интерфейс покажет по слотам и по преподавателям, где и что изменилось.</p>
+      </div>
+
+      <div class="topbar">
+        <input class="search" placeholder="Поиск" id="search" />
+        <div class="controls">
+          <button class="btn" id="compareBtn" disabled>Сравнить</button>
+          <button class="btn secondary" id="clearBtn">Очистить выбор</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Metrics summary -->
+    <div class="metrics">
+      <div class="panel">
+        <h3>Краткая статистика выборки</h3>
+        <div class="metric-row"><div class="metric-name">Средние конфликты</div><div class="metric-value" id="avgConf">—</div></div>
+        <div class="metric-row"><div class="metric-name">Средние окна</div><div class="metric-value" id="avgGaps">—</div></div>
+        <div class="metric-row"><div class="metric-name">Средний баланс</div><div class="metric-value" id="avgBal">—</div></div>
+        <div class="metric-row"><div class="metric-name">Найдено расписаний</div><div class="metric-value" id="countSched">—</div></div>
+      </div>
+
+      <div class="panel">
+        <h3>Легенда</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <div class="badgeb badge good">Хорошо</div>
+          <div class="badgeb badge warn">Умеренно</div>
+          <div class="badgeb badge bad">Плохо</div>
+        </div>
+        <p class="small" style="margin-top:12px">В блоке сравнения показаны детальные различия: по слотам (день/пара/группа) и по преподавателям (какие предметы/слоты изменились).</p>
+      </div>
+    </div>
+
+    <!-- Schedules -->
+    <div class="grid" id="cards">
+      <!-- Each card contains a data-schedule JSON attribute with lessons array -->
+      <!-- Sample schedule A -->
+      <div class="card" data-id="A" data-summary='{"conf":0.05,"gaps":0.12,"balance":0.26,"weighted":0.18}'>
+        <div class="head"><div>
+          <div class="title">Расписание A</div>
+        </div>
+        <label><input type="checkbox" class="sel" data-id="A" /> Выбрать</label>
+        </div>
+
+        <div class="mini-schedule" aria-hidden>
+          <div class="slot">Пн: Матем.</div>
+          <div class="slot">Вт: Физ.</div>
+          <div class="slot">Ср: Хим.</div>
+          <div class="slot">Чт: Биол.</div>
+          <div class="slot">Пт: Ист.</div>
+        </div>
+
+        <div class="meta small">
+          <div>Конфликты: <strong style="margin-left:6px;color:var(--bad)">0.05</strong></div>
+          <div>Окна: <strong style="margin-left:6px;color:var(--warn)">0.12</strong></div>
+          <div>Нагрузка: <strong style="margin-left:6px;color:var(--good)">0.26</strong></div>
+        </div>
+
+        <!-- full schedule JSON (for demo) -->
+        <script type="application/json" class="schedule-data">
+[
+  {"group":"КИ22-03Б","day":0,"slot":0,"subject":"Математика","teacher":"Иванов","room":"101","type":"Лекция"},
+  {"group":"КИ22-03Б","day":1,"slot":0,"subject":"Физика","teacher":"Петров","room":"102","type":"Практика"},
+  {"group":"КИ22-03Б","day":2,"slot":0,"subject":"Химия","teacher":"Смирнов","room":"103","type":"Лаб"},
+  {"group":"КИ21-03Б","day":3,"slot":0,"subject":"Биология","teacher":"Соболев","room":"104","type":"Лекция"},
+  {"group":"КИ22-04Б","day":4,"slot":0,"subject":"История","teacher":"Едреев","room":"105","type":"Лекция"}
+]
+</script>
+
+      </div>
+
+      <!-- Sample schedule B (improved) -->
+      <div class="card" data-id="B" data-summary='{"conf":0.00,"gaps":0.07,"balance":0.21,"weighted":0.09}'>
+        <div class="head"><div>
+          <div class="title">Расписание B</div>
+        </div>
+        <label><input type="checkbox" class="sel" data-id="B" /> Выбрать</label>
+        </div>
+
+        <div class="mini-schedule">
+          <div class="slot">Пн: Матем.</div>
+          <div class="slot">Вт: Физ.</div>
+          <div class="slot">Ср: Лаб.</div>
+          <div class="slot">Чт: Ист.</div>
+          <div class="slot">Пт: Биол.</div>
+        </div>
+
+        <div class="meta small">
+          <div>Конфликты: <strong style="margin-left:6px;color:var(--good)">0.00</strong></div>
+          <div>Окна: <strong style="margin-left:6px;color:var(--good)">0.07</strong></div>
+          <div>Нагрузка: <strong style="margin-left:6px;color:var(--good)">0.21</strong></div>
+        </div>
+
+        <script type="application/json" class="schedule-data">
+[
+  {"group":"КИ22-03Б","day":0,"slot":0,"subject":"Математика","teacher":"Иванов","room":"101","type":"Лекция"},
+  {"group":"КИ22-03Б","day":1,"slot":0,"subject":"Физика","teacher":"Петров","room":"102","type":"Практика"},
+  {"group":"КИ22-03Б","day":2,"slot":0,"subject":"Химия","teacher":"Иванов","room":"103","type":"Лаб"},
+  {"group":"КИ21-03Б","day":3,"slot":0,"subject":"История","teacher":"Соболев","room":"104","type":"Лекция"},
+  {"group":"КИ22-04Б","day":4,"slot":0,"subject":"Биология","teacher":"Едреев","room":"105","type":"Лекция"}
+]
+</script>
+      </div>
+
+      <!-- Sample schedule C (worse) -->
+      <div class="card" data-id="C" data-summary='{"conf":0.12,"gaps":0.22,"balance":0.44,"weighted":0.41}'>
+        <div class="head"><div>
+          <div class="title">Расписание C</div>
+        </div>
+        <label><input type="checkbox" class="sel" data-id="C" /> Выбрать</label>
+        </div>
+
+        <div class="mini-schedule">
+          <div class="slot">Пн: Матем.</div>
+          <div class="slot">Вт: Ист.</div>
+          <div class="slot">Ср: Хим.</div>
+          <div class="slot">Чт: Лаб.</div>
+          <div class="slot">Пт: Физ.</div>
+        </div>
+
+        <div class="meta small">
+          <div>Конфликты: <strong style="margin-left:6px;color:var(--bad)">0.12</strong></div>
+          <div>Окна: <strong style="margin-left:6px;color:var(--bad)">0.22</strong></div>
+          <div>Нагрузки: <strong style="margin-left:6px;color:var(--bad)">0.44</strong></div>
+        </div>
+
+        <script type="application/json" class="schedule-data">
+[
+  {"group":"КИ22-03Б","day":0,"slot":0,"subject":"Математика","teacher":"Иванов","room":"101","type":"Лекция"},
+  {"group":"КИ22-03Б","day":1,"slot":0,"subject":"История","teacher":"Едреев","room":"102","type":"Лекция"},
+  {"group":"КИ22-03Б","day":2,"slot":0,"subject":"Химия","teacher":"Смирнов","room":"103","type":"Лаб"},
+  {"group":"КИ21-03Б","day":3,"slot":0,"subject":"Лаборатория","teacher":"Петров","room":"103","type":"Лаб"},
+  {"group":"КИ22-04Б","day":4,"slot":0,"subject":"Физика","teacher":"Петров","room":"102","type":"Практика"}
+]
+</script>
+      </div>
+
+    </div>
+
+    <!-- compare results -->
+    <div class="compare-panel" id="comparePanel" style="display:none">
+      <div class="compare-header">
+        <div>
+          <strong id="cmpTitle">Сравнение</strong>
+          <div class="small" id="cmpSubtitle">Вы выбрали 2 расписания</div>
+        </div>
+        <div>
+          <button class="btn" id="closeCompare">Закрыть</button>
+        </div>
+      </div>
+
+      <div class="compare-grid">
+        <div class="compare-cell" id="leftCell">
+          <div class="small">Расписание</div>
+          <div id="leftName" style="font-weight:700;margin-top:6px">A</div>
+          <div style="margin-top:10px">Конфликты: <span id="leftConf"></span></div>
+          <div>Окна: <span id="leftGap"></span></div>
+          <div>Нагрузка: <span id="leftBal"></span></div>
+
+          <h4 style="margin-top:12px;margin-bottom:6px">Преподаватели (сводка)</h4>
+          <div id="leftTeachers" class="teacher-list"></div>
+        </div>
+
+        <div class="compare-cell" id="rightCell">
+          <div class="small">Расписание</div>
+          <div id="rightName" style="font-weight:700;margin-top:6px">B</div>
+          <div style="margin-top:10px">Конфликты: <span id="rightConf"></span></div>
+          <div>Окна: <span id="rightGap"></span></div>
+          <div>Нагрузка: <span id="rightBal"></span></div>
+
+          <h4 style="margin-top:12px;margin-bottom:6px">Преподаватели (сводка)</h4>
+          <div id="rightTeachers" class="teacher-list"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <h4>Различия по слотам (день / пара / группа)</h4>
+        <table class="slot-table" id="slotDiffTable" aria-live="polite">
+          <thead>
+            <tr><th>День</th><th>Пара</th><th>Группа</th><th>Предмет (A → B)</th><th>Преподаватель (A → B)</th></tr>
+          </thead>
+          <tbody id="slotDiffBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+<script>
+  // --- utility day names (русские)
+  const DAYS = ["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
+
+  // collect cards
+  const cards = [...document.querySelectorAll('.card')];
+  const checkboxes = document.querySelectorAll('.sel');
+  const compareBtn = document.getElementById('compareBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const comparePanel = document.getElementById('comparePanel');
+  const closeCompare = document.getElementById('closeCompare');
+
+  // helper: read schedule JSON from .schedule-data script tag inside a card
+  function readScheduleFromCard(card) {
+    const script = card.querySelector('.schedule-data');
+    if (!script) return [];
+    try {
+      const arr = JSON.parse(script.textContent);
+      return arr;
+    } catch (e) {
+      console.error('Invalid schedule JSON', e);
+      return [];
+    }
+  }
+
+  function getSelected(){
+    return [...checkboxes].filter(c=>c.checked).map(c=>{
+      const id = c.dataset.id;
+      const card = document.querySelector('.card[data-id="'+id+'"]');
+      const summary = card.dataset.summary ? JSON.parse(card.dataset.summary) : {};
+      return {
+        id,
+        card,
+        name: card.querySelector('.title').innerText,
+        summary,
+        schedule: readScheduleFromCard(card)
+      };
+    });
+  }
+
+  function refreshControls(){
+    const sel = getSelected();
+    compareBtn.disabled = sel.length !== 2;
+  }
+
+  checkboxes.forEach(cb=>{
+    cb.addEventListener('change', ()=> {
+      const sel = [...checkboxes].filter(c=>c.checked);
+      if(sel.length>2) cb.checked=false;
+      refreshControls();
+    });
+  });
+
+  // Search filter
+  document.getElementById('search').addEventListener('input',(e)=>{
+    const v = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(card=>{
+      const txt = card.innerText.toLowerCase();
+      card.style.display = txt.includes(v) ? '' : 'none';
+    });
+  });
+
+  // initialize metrics summary
+  (function initSummary(){
+    const summaries = cards.map(c=>{
+      const s = c.dataset.summary ? JSON.parse(c.dataset.summary) : null;
+      return s;
+    }).filter(Boolean);
+    if(summaries.length===0) return;
+    const avgConf = summaries.reduce((s,x)=>s+x.conf,0)/summaries.length;
+    const avgGaps = summaries.reduce((s,x)=>s+x.gaps,0)/summaries.length;
+    const avgBal = summaries.reduce((s,x)=>s+x.balance,0)/summaries.length;
+    document.getElementById('avgConf').innerText = avgConf.toFixed(3);
+    document.getElementById('avgGaps').innerText = avgGaps.toFixed(3);
+    document.getElementById('avgBal').innerText = avgBal.toFixed(3);
+    document.getElementById('countSched').innerText = summaries.length;
+  })();
+
+  // Compare logic: build index by key group|day|slot
+  function buildIndex(schedule) {
+    // key: group|day|slot
+    const idx = {};
+    (schedule||[]).forEach(l=>{
+      const key = `${l.group}|${l.day}|${l.slot}`;
+      idx[key] = l;
+    });
+    return idx;
+  }
+
+  // compute teacher assignment map: teacher -> array of {group,day,slot,subject,room}
+  function buildTeacherMap(schedule) {
+    const map = {};
+    (schedule||[]).forEach(l=>{
+      if(!map[l.teacher]) map[l.teacher]=[];
+      map[l.teacher].push({group:l.group,day:l.day,slot:l.slot,subject:l.subject,room:l.room,type:l.type});
+    });
+    return map;
+  }
+
+  // compute differences between schedules A and B
+  function compareSchedules(A, B) {
+    const idxA = buildIndex(A);
+    const idxB = buildIndex(B);
+
+    // collect all keys
+    const keys = new Set([...Object.keys(idxA), ...Object.keys(idxB)]);
+    const slotDiffs = [];
+    keys.forEach(k => {
+      const a = idxA[k] || null;
+      const b = idxB[k] || null;
+      // key format
+      const parts = k.split('|');
+      const group = parts[0];
+      const day = parseInt(parts[1],10);
+      const slot = parseInt(parts[2],10);
+
+      // if both exist and identical subject+teacher -> skip
+      const subjA = a ? a.subject : null;
+      const subjB = b ? b.subject : null;
+      const tA = a ? a.teacher : null;
+      const tB = b ? b.teacher : null;
+
+      if(subjA === subjB && tA === tB) {
+        // no difference -> still might want to show if one is missing? skip
+        return;
+      }
+
+      slotDiffs.push({
+        day, slot, group,
+        subjA, subjB, tA, tB
+      });
+    });
+
+    // teacher-level diffs
+    const mapA = buildTeacherMap(A);
+    const mapB = buildTeacherMap(B);
+    const teachers = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
+    const teacherDiffs = [];
+    teachers.forEach(t => {
+      const lessonsA = mapA[t] || [];
+      const lessonsB = mapB[t] || [];
+
+      // helper to format lesson key
+      const keyOf = (ln)=> `${ln.group}|${ln.day}|${ln.slot}|${ln.subject}`;
+
+      const setA = new Set(lessonsA.map(keyOf));
+      const setB = new Set(lessonsB.map(keyOf));
+
+      const added = lessonsB.filter(l=>!setA.has(keyOf(l)));
+      const removed = lessonsA.filter(l=>!setB.has(keyOf(l)));
+      const stayed = lessonsB.filter(l=>setA.has(keyOf(l)));
+
+      if(added.length||removed.length) {
+        teacherDiffs.push({teacher:t,added,removed,stayed});
+      }
+    });
+
+    return {slotDiffs, teacherDiffs};
+  }
+
+  // render teacher summary block
+  function renderTeacherSummary(container, teacherMap) {
+    container.innerHTML = '';
+    // teacherMap: teacher -> lessons[]
+    const teachers = Object.keys(teacherMap);
+    if(teachers.length===0) {
+      container.innerHTML = '<div class="small">Нет данных</div>';
+      return;
+    }
+    teachers.forEach(t=>{
+      const node = document.createElement('div');
+      node.className = 'teacher-item';
+      const lessons = teacherMap[t];
+      const name = document.createElement('div');
+      name.innerHTML = `<strong>${t}</strong> — ${lessons.length} пар(-ы)`;
+      node.appendChild(name);
+      lessons.forEach(ls=>{
+        const row = document.createElement('div');
+        row.className='small';
+        row.style.marginTop='6px';
+        row.innerText = `${DAYS[ls.day] || ('Д'+ls.day)} | Пара ${ls.slot+1} | ${ls.group} — ${ls.subject} (${ls.room})`;
+        node.appendChild(row);
+      });
+      container.appendChild(node);
+    });
+  }
+
+  // render slot diffs table
+  function renderSlotDiffs(slotDiffs) {
+    const tbody = document.getElementById('slotDiffBody');
+    tbody.innerHTML = '';
+    if(slotDiffs.length===0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="5" class="small">Различий по слотам не обнаружено</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+    // sort by day, slot, group
+    slotDiffs.sort((a,b)=>{
+      if(a.day!==b.day) return a.day-b.day;
+      if(a.slot!==b.slot) return a.slot-b.slot;
+      return a.group.localeCompare(b.group);
+    });
+    slotDiffs.forEach(d=>{
+      const tr = document.createElement('tr');
+      const subjCell = `${d.subjA || '—'} → ${d.subjB || '—'}`;
+      const teachCell = `${d.tA || '—'} → ${d.tB || '—'}`;
+      tr.innerHTML = `<td>${DAYS[d.day] || d.day}</td>
+                      <td>Пара ${d.slot+1}</td>
+                      <td>${d.group}</td>
+                      <td>${escapeHtml(subjCell)}</td>
+                      <td>${escapeHtml(teachCell)}</td>`;
+      // highlight row if teacher changed
+      if(d.tA !== d.tB && d.tA !== null && d.tB !== null) {
+        tr.style.background = 'linear-gradient(90deg, rgba(255,245,240,0.6), rgba(255,255,255,0))';
+      }
+      tbody.appendChild(tr);
+    });
+  }
+
+  // escape
+  function escapeHtml(s){
+    if(!s) return '';
+    return String(s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
+  }
+
+  // handler for Compare
+  compareBtn.addEventListener('click', ()=> {
+    const sel = getSelected();
+    if(sel.length!==2) return;
+    const [A,B] = sel;
+
+    // fill left/right basic metrics
+    document.getElementById('leftName').innerText = A.name;
+    document.getElementById('leftConf').innerText = (A.summary.conf || 0).toFixed(3);
+    document.getElementById('leftGap').innerText = (A.summary.gaps || 0).toFixed(3);
+    document.getElementById('leftBal').innerText = (A.summary.balance || 0).toFixed(3);
+
+    document.getElementById('rightName').innerText = B.name;
+    document.getElementById('rightConf').innerText = (B.summary.conf || 0).toFixed(3);
+    document.getElementById('rightGap').innerText = (B.summary.gaps || 0).toFixed(3);
+    document.getElementById('rightBal').innerText = (B.summary.balance || 0).toFixed(3);
+
+    // teacher maps
+    const mapA = buildTeacherMap(A.schedule);
+    const mapB = buildTeacherMap(B.schedule);
+
+    // render teacher summaries
+    renderTeacherSummary(document.getElementById('leftTeachers'), mapA);
+    renderTeacherSummary(document.getElementById('rightTeachers'), mapB);
+
+    // compute diffs
+    const diffs = compareSchedules(A.schedule, B.schedule);
+    renderSlotDiffs(diffs.slotDiffs);
+
+    // open panel
+    comparePanel.style.display='block';
+    window.scrollTo({top: comparePanel.offsetTop-20, behavior:'smooth'});
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    checkboxes.forEach(c=>c.checked=false);
+    refreshControls();
+    comparePanel.style.display='none';
+  });
+
+  closeCompare.addEventListener('click', ()=> {
+    comparePanel.style.display='none';
+  });
+
+  // initial refresh
+  refreshControls();
+
+</script>
+</body>
+</html>

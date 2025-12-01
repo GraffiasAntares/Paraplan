@@ -21,10 +21,24 @@ private:
     // Проверка доминирования
     bool dominates(const std::vector<double>& a, const std::vector<double>& b) const {
         bool at_least_one_better = false;
+
+        // Получаем веса из Config
+        std::vector<double> weights = {
+            Config::weights.hard_conflict,
+            Config::weights.soft_gap,
+            Config::weights.soft_balance,
+            Config::weights.capacity_conflict,
+            Config::weights.type_conflict,
+            Config::weights.teacher_load
+        };
+
         for (size_t i = 0; i < a.size(); ++i) {
-            if (a[i] > b[i]) return false; // a не доминирует b, если хуже хотя бы в одной цели
-            if (a[i] < b[i]) at_least_one_better = true;
+            double weighted_a = a[i] * weights[i];
+            double weighted_b = b[i] * weights[i];
+            if (weighted_a > weighted_b) return false;          // A хуже B
+            if (weighted_a < weighted_b) at_least_one_better = true;
         }
+
         return at_least_one_better;
     }
 

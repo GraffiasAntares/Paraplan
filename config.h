@@ -14,16 +14,16 @@ namespace Config {
     const int POPULATION_SIZE = 10;
     const int MAX_GENERATIONS = 500;
     const double MUTATION_RATE = 0.1;
+    const double HOURS_PER_CLASS = 1.5;  // 1 пара = 1.5 часа
 
     // Весовые коэффициенты для фитнеса
     struct FitnessWeights {
-        double hard_conflict = 0.7;         // За каждый конфликт преподавателя / комнаты / группы
-        double soft_gap = 0.02;               // За окна в расписании
-        double soft_balance = 0.02;           // За неравномерное распределение
-        double capacity_conflict = 0.02;     // За нехватку мест
-        double type_conflict = 0.02;         // За неподходящий класс аудитории
-        double teacher_load = 0.2;           // За отклонение от желаемой нагрузки
-        double teacher_pref = 0.02;           // За занятия в нежелательные дни
+        double hard_conflict = 1;         // За каждый конфликт преподавателя / комнаты / группы
+        double soft_gap = 1;               // За окна в расписании
+        double soft_balance = 1;           // За неравномерное распределение
+        double capacity_conflict = 1;     // За нехватку мест
+        double type_conflict = 1;         // За неподходящий класс аудитории
+        double teacher_load = 1;           // За отклонение от желаемой нагрузки
     };
 
     inline FitnessWeights weights;
@@ -51,18 +51,11 @@ namespace Config {
         {3, 3}, {3, 4}, {4, 0}, {4, 4}
     };
 
-    // === Предпочтения преподавателей ===
-    // Желаемая недельная нагрузка (в количестве пар)
-    inline std::unordered_map<int, int> teacher_desired_load = {
-        {0, 8}, {1, 10}, {2, 12}, {3, 8}, {4, 6}
-    };
-
-    // Предпочтительные дни недели (0=Пн, 1=Вт, 2=Ср, 3=Чт, 4=Пт, 5=Сб)
-    inline std::unordered_map<int, std::vector<int>> teacher_preferred_days = {
-        {0, {0, 1, 2, 3}},       // Иванов: Пн–Чт
-        {1, {0, 1, 2, 3, 4}},    // Смирнов: Пн–Пт
-        {2, {1, 2, 3}},          // Петров: Вт–Чт
-        {3, {0, 1, 2, 3, 4}},    // Соболев: Пн–Пт
-        {4, {0, 1, 2}}           // Едреев: Пн–Ср
+    inline std::unordered_map<int, double> teacher_desired_hours = {
+        {0, 180.0},  // Иванов
+        {1, 240.0},  // Смирнов
+        {2, 300.0},  // Петров
+        {3, 180.0},  // Соболев
+        {4, 120.0}   // Едреев
     };
 }
