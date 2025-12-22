@@ -12,18 +12,18 @@ namespace Config {
     const int SLOTS_PER_DAY = 6;
     const int NUM_DAYS = 6; // включая субботу
     const int POPULATION_SIZE = 10;
-    const int MAX_GENERATIONS = 500;
-    const double MUTATION_RATE = 0.1;
+    const int MAX_GENERATIONS = 2000;
+    const double MUTATION_RATE = 0.05;
     const double HOURS_PER_CLASS = 1.5;  // 1 пара = 1.5 часа
 
     // Весовые коэффициенты для фитнеса
     struct FitnessWeights {
-        double hard_conflict = 1;         // За каждый конфликт преподавателя / комнаты / группы
-        double soft_gap = 1;               // За окна в расписании
-        double soft_balance = 1;           // За неравномерное распределение
-        double capacity_conflict = 1;     // За нехватку мест
-        double type_conflict = 1;         // За неподходящий класс аудитории
-        double teacher_load = 1;           // За отклонение от желаемой нагрузки
+        double hard_conflict = 1.;         // За каждый конфликт преподавателя / комнаты / группы
+        double soft_gap = 0.5;               // За окна в расписании
+        double soft_balance = 0.5;           // За неравномерное распределение
+        double capacity_conflict = 0.2;     // За нехватку мест
+        double type_conflict = 1.;         // За неподходящий класс аудитории
+        double teacher_load = 1.;           // За отклонение от желаемой нагрузки
     };
 
     inline FitnessWeights weights;

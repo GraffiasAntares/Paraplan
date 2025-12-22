@@ -1,6 +1,7 @@
 #include "genetic_algorithm.h"
 #include <iostream>
 #include <iomanip> // для std::setprecision
+#include <filesystem>
 
 void printSchedule(const Schedule& s, int index) {
     auto fitness = s.calculateFitness();
@@ -56,16 +57,26 @@ void printSchedule(const Schedule& s, int index) {
     }
 }
 
+
 int main() {
     GeneticAlgorithm ga;
     std::vector<Schedule> pareto_front = ga.run();
 
-    std::cout << "\n=== Найдено " << pareto_front.size()
-              << " Парето-оптимальных расписаний ===\n";
+//    std::cout << "\n=== Найдено " << pareto_front.size()
+//              << " Парето-оптимальных расписаний ===\n";
+//
+//    for (size_t i = 0; i < pareto_front.size(); ++i) {
+//        std::string filename = "/Users/gyuk/Star/Учёба/СФУ/ККП/Расписания/schedule_" + std::to_string(i+1) + ".csv";
+//        pareto_front[i].exportToCSV(filename);
+//    }
+
+    std::filesystem::create_directory("output");
 
     for (size_t i = 0; i < pareto_front.size(); ++i) {
-        std::string filename = "/Users/gyuk/Star/Учёба/СФУ/ККП/Расписания/schedule_" + std::to_string(i+1) + ".csv";
-        pareto_front[i].exportToCSV(filename);
+        printSchedule(pareto_front[i], i);
+        pareto_front[i].exportToCSV(
+            "/Users/gyuk/Star/Учёба/СФУ/ККП/Расписания/расписание_" + std::to_string(i+1) + ".csv"
+        );
     }
 
     return 0;

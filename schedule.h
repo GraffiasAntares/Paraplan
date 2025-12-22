@@ -9,6 +9,18 @@
 #include <fstream>
 #include <iomanip>
 
+
+struct FitnessReport {
+    double hard_conflicts;
+    double soft_gaps;
+    double soft_balance;
+    double capacity_conflicts;
+    double type_conflicts;
+
+    double weighted_sum; // если используешь веса
+};
+
+
 class Schedule {
 public:
     std::vector<Lesson> lessons;
@@ -46,21 +58,19 @@ public:
         }
     }
 
-    std::vector<double> calculateFitness(int generation = 0, int maxGenerations = 1) const {
+
+    FitnessReport calculateFitnessReport() const {
         double hard_conflicts = 0.0;
         double soft_gaps = 0.0;
         double soft_balance = 0.0;
         double capacity_conflicts = 0.0;
         double type_conflicts = 0.0;
-        double soft_teacher_load = 0.0;
-        double soft_teacher_pref = 0.0;
 
-        // === Проверка жёстких конфликтов (группы, преподаватели, аудитории) ===
+        // --- Жёсткие конфликты ---
         for (size_t i = 0; i < lessons.size(); ++i) {
             for (size_t j = i + 1; j < lessons.size(); ++j) {
                 const Lesson& a = lessons[i];
                 const Lesson& b = lessons[j];
-
                 if (a.day == b.day && a.slot == b.slot) {
                     if (a.group == b.group) hard_conflicts++;
                     if (a.teacher == b.teacher) hard_conflicts++;
@@ -69,7 +79,7 @@ public:
             }
         }
 
-        // === Проверка конфликтов по вместимости и типу аудитории ===
+        // --- Вместимость и тип аудитории ---
         for (const auto& l : lessons) {
             if (Config::group_sizes[l.group] > l.room_capacity)
                 capacity_conflicts++;
@@ -80,77 +90,73 @@ public:
                 type_conflicts++;
         }
 
-        // === Мягкие: окна у групп ===
+        // --- Окна ---
         for (int g = 0; g < Config::NUM_GROUPS; ++g) {
             for (int d = 0; d < Config::NUM_DAYS; ++d) {
                 std::vector<int> slots;
-                for (auto& l : lessons)
+                for (const auto& l : lessons)
                     if (l.group == g && l.day == d)
                         slots.push_back(l.slot);
 
-                if (slots.size() > 1) {
-                    std::sort(slots.begin(), slots.end());
-                    for (size_t i = 1; i < slots.size(); ++i)
-                        soft_gaps += (slots[i] - slots[i - 1] - 1);
-                }
+                std::sort(slots.begin(), slots.end());
+                for (size_t i = 1; i < slots.size(); ++i)
+                    soft_gaps += (slots[i] - slots[i - 1] - 1);
             }
         }
 
-        // Мягкие: баланс нагрузки (равномерность по дням)
+        // --- Баланс ---
         for (int g = 0; g < Config::NUM_GROUPS; ++g) {
             std::vector<int> per_day(Config::NUM_DAYS, 0);
-            for (auto& l : lessons)
+            for (const auto& l : lessons)
                 if (l.group == g)
                     per_day[l.day]++;
 
             double mean = 0.0;
-            for (auto v : per_day) mean += v;
+            for (int v : per_day) mean += v;
             mean /= Config::NUM_DAYS;
 
-            for (auto v : per_day)
+            for (int v : per_day)
                 soft_balance += std::pow(v - mean, 2);
         }
-        
-        // Подсчет фактической нагрузки преподавателей
-        std::unordered_map<int, int> teacher_classes_count;
-        for (auto &l : lessons)
-            teacher_classes_count[l.teacher]++;
 
-        double teacher_load_deviation = 0.0;
-        for (int t = 0; t < Config::NUM_TEACHERS; ++t) {
-            double actual_hours = teacher_classes_count[t] * Config::HOURS_PER_CLASS;
-            double desired_hours = Config::teacher_desired_hours.at(t);
-            double diff = actual_hours - desired_hours;
-            teacher_load_deviation += diff * diff; // квадрат отклонения (чтобы большие перегрузки штрафовать сильнее)
-        }
+        // --- Нормировка ---
+        double n = lessons.size();
+        hard_conflicts /= (n * (n - 1) / 2.0);
+        soft_gaps /= (Config::NUM_GROUPS * Config::NUM_DAYS * (Config::SLOTS_PER_DAY - 1));
+        soft_balance /= (Config::NUM_GROUPS * std::pow(Config::NUM_DAYS, 2));
+        capacity_conflicts /= n;
+        type_conflicts /= n;
 
-        // Нормировка
-        double max_conflicts = lessons.size() * (lessons.size() - 1) / 2.0;
-        double max_gaps = Config::NUM_GROUPS * Config::NUM_DAYS * (Config::SLOTS_PER_DAY - 1);
-        double max_balance = Config::NUM_GROUPS * std::pow(Config::NUM_DAYS, 2);
-        double max_capacity_conflicts = lessons.size();
-        double max_type_conflicts = lessons.size();
+        // --- Взвешенная сумма ---
+        double weighted =
+            Config::weights.hard_conflict * hard_conflicts +
+            Config::weights.soft_gap * soft_gaps +
+            Config::weights.soft_balance * soft_balance +
+            Config::weights.capacity_conflict * capacity_conflicts +
+            Config::weights.type_conflict * type_conflicts;
 
-        double max_teacher_load = Config::NUM_TEACHERS * std::pow(Config::NUM_DAYS * Config::SLOTS_PER_DAY * Config::HOURS_PER_CLASS, 2);
-
-        hard_conflicts = max_conflicts > 0 ? hard_conflicts / max_conflicts : 0.0;
-        soft_gaps = max_gaps > 0 ? soft_gaps / max_gaps : 0.0;
-        soft_balance = max_balance > 0 ? soft_balance / max_balance : 0.0;
-        capacity_conflicts = max_capacity_conflicts > 0 ? capacity_conflicts / max_capacity_conflicts : 0.0;
-        type_conflicts = max_type_conflicts > 0 ? type_conflicts / max_type_conflicts : 0.0;
-        teacher_load_deviation = max_teacher_load > 0 ? teacher_load_deviation / max_teacher_load : 0.0;
-
-        // === Возврат нормированных целей ===
         return {
             hard_conflicts,
             soft_gaps,
             soft_balance,
             capacity_conflicts,
             type_conflicts,
-            teacher_load_deviation
+            weighted
         };
     }
 
+    std::vector<double> calculateFitness() const {
+        auto r = calculateFitnessReport();
+        return {
+            r.hard_conflicts,
+            r.soft_gaps,
+            r.soft_balance,
+            r.capacity_conflicts,
+            r.type_conflicts,
+            r.weighted_sum
+        };
+    }
+    
     void mutate(std::mt19937& gen, double mutation_rate = Config::MUTATION_RATE) {
         std::uniform_real_distribution<> prob(0.0, 1.0);
         std::uniform_int_distribution<> room_dist(0, Config::NUM_ROOMS - 1);
@@ -216,27 +222,31 @@ public:
     }
 
     void exportToCSV(const std::string& filename) const {
-        std::ofstream out(filename);
+        std::ofstream file(filename);
+        auto r = calculateFitnessReport();
 
-        if (!out.is_open()) {
-            std::cerr << "Ошибка: не удалось открыть файл " << filename << "\n";
-            return;
-        }
+        file << "# === ОЦЕНКА РАСПИСАНИЯ ===\n";
+        file << "Жёсткие конфликты," << r.hard_conflicts << "\n";
+        file << "Окна," << r.soft_gaps << "\n";
+        file << "Баланс," << r.soft_balance << "\n";
+        file << "Вместимость," << r.capacity_conflicts << "\n";
+        file << "Тип аудитории," << r.type_conflicts << "\n";
+        file << "Взвешенная оценка," << r.weighted_sum << "\n\n";
 
-        // Заголовок CSV
-        out << "Группа,День,Слот,Предмет,Преподаватель,Аудитория,Тип занятия\n";
+        file << "# === РАСПИСАНИЕ ===\n";
+        file << "Группа,День,Слот,Предмет,Преподаватель,Аудитория,Тип\n";
 
         for (const auto& l : lessons) {
-            out << Config::groups[l.group] << ","
-                << Config::days[l.day] << ","
-                << (l.slot + 1) << ","
-                << Config::subjects[l.subject] << ","
-                << Config::teachers[l.teacher] << ","
-                << Config::rooms[l.room] << ","
-                << l.type << "\n";
+            file << Config::groups[l.group] << ","
+                 << Config::days[l.day] << ","
+                 << (l.slot + 1) << ","
+                 << Config::subjects[l.subject] << ","
+                 << Config::teachers[l.teacher] << ","
+                 << Config::rooms[l.room] << ","
+                 << l.type << "\n";
         }
-
-        out.close();
-        std::cout << "CSV успешно сохранён в: " << filename << "\n";
     }
+
 };
+
+
